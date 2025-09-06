@@ -14,12 +14,21 @@
     .pulse { box-shadow: 0 0 0 0 rgba(59,130,246,0.7); animation: pulse 1.8s infinite; }
     @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(59,130,246,0.7); } 70% { box-shadow:0 0 0 20px rgba(59,130,246,0); } 100% { box-shadow:0 0 0 0 rgba(59,130,246,0); } }
 
-    /* HUD — center visual */
-    .hud { position: relative; width: 100%; aspect-ratio: 1.6/1; margin: 0 auto 1rem; display: grid; place-items: center; overflow: hidden;
-           background: radial-gradient(closest-side, rgba(37,99,235,0.08), transparent 60%); border-radius: 1.25rem; border: 1px solid rgba(59,130,246,0.15);
-           transition: box-shadow .3s, background .3s, transform .3s; }
+    /* HUD — centered, square, no clipping */
+    .hud {
+      position: relative;
+      width: clamp(300px, 80vmin, 900px);   /* responsive size */
+      aspect-ratio: 1 / 1;                  /* keep it perfectly round */
+      margin: 0 auto 1rem;
+      padding: 1.25rem;                     /* inner padding prevents edge clipping */
+      display: grid; place-items: center;
+      overflow: hidden;
+      background: radial-gradient(closest-side, rgba(37,99,235,0.08), transparent 60%);
+      border-radius: 1.25rem; border: 1px solid rgba(59,130,246,0.15);
+      transition: box-shadow .3s, background .3s, transform .3s;
+    }
     .hud.speaking { background: radial-gradient(closest-side, rgba(59,130,246,0.18), transparent 60%); box-shadow: 0 0 24px rgba(59,130,246,.35), inset 0 0 32px rgba(59,130,246,.25); transform: translateZ(0) scale(1.01); }
-    .hud svg { width: 80%; height: auto; filter: drop-shadow(0 0 8px rgba(59,130,246,.35)); }
+    .hud svg { width: 100%; height: auto; filter: drop-shadow(0 0 8px rgba(59,130,246,.35)); }
     .hud.speaking svg { filter: drop-shadow(0 0 14px rgba(96,165,250,.6)); }
     .hud .spin-slow { animation: spin 18s linear infinite; transform-origin: 50% 50%; }
     .hud .spin-fast { animation: spin 6s linear infinite; transform-origin: 50% 50%; }
@@ -52,10 +61,10 @@
       <!-- HUD -->
       <section class="hud">
         <svg viewBox="0 0 200 200" aria-hidden="true">
-          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(59,130,246,0.18)" stroke-width="1"/>
-          <g class="spin-slow"><circle cx="100" cy="100" r="72" fill="none" stroke="rgba(59,130,246,0.45)" stroke-width="1" stroke-dasharray="2 6"/></g>
-          <g class="spin-fast"><circle cx="100" cy="100" r="60" fill="none" stroke="rgba(147,197,253,0.6)" stroke-width="1" stroke-dasharray="6 8"/></g>
-          <g class="sweep"><path d="M100,100 L100,24 A76,76 0 0,1 164,100 Z" fill="url(#grad)" opacity="0.35"/></g>
+          <circle cx="100" cy="100" r="86" fill="none" stroke="rgba(59,130,246,0.18)" stroke-width="1"/>
+          <g class="spin-slow"><circle cx="100" cy="100" r="70" fill="none" stroke="rgba(59,130,246,0.45)" stroke-width="1" stroke-dasharray="2 6"/></g>
+          <g class="spin-fast"><circle cx="100" cy="100" r="58" fill="none" stroke="rgba(147,197,253,0.6)" stroke-width="1" stroke-dasharray="6 8"/></g>
+          <g class="sweep"><path d="M100,100 L100,26 A74,74 0 0,1 162,100 Z" fill="url(#grad)" opacity="0.35"/></g>
           <circle class="core" cx="100" cy="100" r="20" fill="rgba(59,130,246,0.15)" stroke="rgba(191,219,254,0.8)" stroke-width="1"/>
           <circle class="pulse-dot" cx="140" cy="88" r="3" fill="rgb(96,165,250)"/>
           <defs>
@@ -96,7 +105,7 @@
 const CONFIG = {
   N8N_WEBHOOK_URL: "https://YOUR_N8N_DOMAIN/webhook/friday", // <— CHANGE THIS
   MODEL_HINT: "You are FRIDAY, Mossie’s assistant.",
-  VOICE_NAME: null, // e.g. "Microsoft Zira" | "Google US English" | null
+  VOICE_NAME: null,
   WAKE_WORD: "hey friday",
   AUTO_LISTEN_AFTER_WAKE_MS: 5500,
 };
@@ -136,19 +145,12 @@ async function sendTextToFriday(text) {
 }
 async function handleUserText(text) {
   if (!text) return;
-  addMessage('user', text);
-  textEl.value = '';
-  setStatus('Thinking…');
+  addMessage('user', text); textEl.value = ''; setStatus('Thinking…');
   try {
     const data = await sendTextToFriday(text);
     const reply = data.reply || '(No reply)';
     addMessage('assistant', reply);
-    if (data.audioUrl) {
-      // prefer server audio if provided
-      await playServerAudio(data.audioUrl);
-    } else {
-      speak(reply);
-    }
+    if (data.audioUrl) { await playServerAudio(data.audioUrl); } else { speak(reply); }
     setStatus('Ready');
   } catch (e) {
     console.error(e);
@@ -160,102 +162,49 @@ async function handleUserText(text) {
 /***********************
  * 4) SPEAK (Text → Voice) + HUD reactions
  ***********************/
-function beginHudSpeak() {
-  const hud = document.querySelector('.hud');
-  const core = document.querySelector('.hud .core');
-  if (hud) hud.classList.add('speaking');
-  if (core) core.style.animation = 'coreThrob 1.2s ease-in-out infinite';
-}
-function endHudSpeak() {
-  const hud = document.querySelector('.hud');
-  const core = document.querySelector('.hud .core');
-  if (hud) hud.classList.remove('speaking');
-  if (core) core.style.animation = '';
-}
-function speak(text) {
+function beginHudSpeak(){ document.querySelector('.hud')?.classList.add('speaking'); const c=document.querySelector('.hud .core'); if(c) c.style.animation='coreThrob 1.2s ease-in-out infinite'; }
+function endHudSpeak(){ document.querySelector('.hud')?.classList.remove('speaking'); const c=document.querySelector('.hud .core'); if(c) c.style.animation=''; }
+function speak(text){
   if (!toggleTTS.checked) return;
   const u = new SpeechSynthesisUtterance(text);
-  if (CONFIG.VOICE_NAME) {
-    const v = speechSynthesis.getVoices().find(v => v.name === CONFIG.VOICE_NAME);
-    if (v) u.voice = v;
-  }
-  u.onstart = beginHudSpeak;
-  const cleanup = () => endHudSpeak();
-  u.onend = cleanup; u.onerror = cleanup; u.onpause = cleanup;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+  if (CONFIG.VOICE_NAME){ const v = speechSynthesis.getVoices().find(v=>v.name===CONFIG.VOICE_NAME); if (v) u.voice = v; }
+  u.onstart = beginHudSpeak; const cleanup = () => endHudSpeak(); u.onend = cleanup; u.onerror = cleanup; u.onpause = cleanup;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
-// server audio (e.g., ElevenLabs)
-function playServerAudio(url) {
-  return new Promise((resolve) => {
-    serverAudio.src = url;
-    serverAudio.onplay = beginHudSpeak;
-    const cleanup = () => { endHudSpeak(); serverAudio.onended = serverAudio.onerror = null; resolve(); };
-    serverAudio.onended = cleanup;
-    serverAudio.onerror = cleanup;
-    serverAudio.play().catch(cleanup);
-  });
+function playServerAudio(url){
+  return new Promise((resolve)=>{ serverAudio.src=url; serverAudio.onplay=beginHudSpeak;
+    const done=()=>{ endHudSpeak(); serverAudio.onended=serverAudio.onerror=null; resolve(); };
+    serverAudio.onended=done; serverAudio.onerror=done; serverAudio.play().catch(done); });
 }
 speechSynthesis.onvoiceschanged = () => {};
 
 /***********************
  * 5) BROWSER STT (Voice → Text)
  ***********************/
-let recognizer = null;
-let listening = false;
-let wakeArmed = false;
-let postWakeTimer = null;
-
-function supportsRecognition() { return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window; }
-function buildRecognizer() {
+let recognizer=null, listening=false, wakeArmed=false, postWakeTimer=null;
+function supportsRecognition(){ return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window; }
+function buildRecognizer(){
   const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new R();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.lang = navigator.language || 'en-US';
-  rec.onstart = () => setStatus('Mic listening…');
-  rec.onerror = (e) => setStatus('Mic error: ' + (e.error||'unknown'));
-  rec.onend = () => { setStatus('Mic idle'); listening = false; };
-  rec.onresult = (ev) => {
-    let lastFinal = '';
-    for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      const r = ev.results[i];
-      const t = r[0].transcript.toLowerCase().trim();
-      if (r.isFinal) lastFinal = t;
-      if (toggleWake.checked && wakeArmed && t.includes(CONFIG.WAKE_WORD)) {
-        wakeArmed = false;
-        micBtn.classList.add('pulse');
-        setStatus('Wake word heard. Speak your request…');
-        clearTimeout(postWakeTimer);
-        postWakeTimer = setTimeout(() => {
-          micBtn.classList.remove('pulse');
-          const cleaned = (lastFinal||'').replace(CONFIG.WAKE_WORD, '').trim();
-          if (cleaned) handleUserText(cleaned);
-          wakeArmed = true;
-          setStatus('Ready');
-        }, CONFIG.AUTO_LISTEN_AFTER_WAKE_MS);
-      }
-    }
-  };
+  const rec = new R(); rec.continuous=true; rec.interimResults=true; rec.lang=navigator.language||'en-US';
+  rec.onstart=()=>setStatus('Mic listening…'); rec.onerror=e=>setStatus('Mic error: '+(e.error||'unknown')); rec.onend=()=>{ setStatus('Mic idle'); listening=false; };
+  rec.onresult=(ev)=>{ let lastFinal=''; for (let i=ev.resultIndex;i<ev.results.length;i++){ const r=ev.results[i]; const t=r[0].transcript.toLowerCase().trim(); if(r.isFinal) lastFinal=t;
+      if (toggleWake.checked && wakeArmed && t.includes(CONFIG.WAKE_WORD)){ wakeArmed=false; micBtn.classList.add('pulse'); setStatus('Wake word heard. Speak your request…');
+        clearTimeout(postWakeTimer); postWakeTimer=setTimeout(()=>{ micBtn.classList.remove('pulse'); const cleaned=(lastFinal||'').replace(CONFIG.WAKE_WORD,'').trim(); if(cleaned) handleUserText(cleaned); wakeArmed=true; setStatus('Ready'); }, CONFIG.AUTO_LISTEN_AFTER_WAKE_MS);
+      } } };
   return rec;
 }
-function ensureRecognizer() { if (!recognizer) recognizer = buildRecognizer(); }
+function ensureRecognizer(){ if(!recognizer) recognizer=buildRecognizer(); }
 
-// Mic button: first click arms wake-word; click again for push-to-talk burst
 micBtn.addEventListener('click', async () => {
-  if (!supportsRecognition()) { alert('Your browser does not support Speech Recognition. Try Chrome or Edge on desktop.'); return; }
+  if (!supportsRecognition()){ alert('Your browser does not support Speech Recognition. Try Chrome or Edge on desktop.'); return; }
   ensureRecognizer();
-  if (!listening) {
-    recognizer.start(); listening = true; wakeArmed = true; setStatus('Listening (wake word armed)…');
-  } else {
-    wakeArmed = false; setStatus('Push-to-talk: speak now…');
-    try { recognizer.stop(); } catch {}
-    ensureRecognizer();
-    const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const single = new R();
-    single.continuous = false; single.interimResults = false; single.lang = navigator.language || 'en-US';
-    single.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) handleUserText(t); };
-    single.onend = () => { setStatus('Listening (wake word armed)…'); wakeArmed = true; try { recognizer.start(); listening = true; } catch {} };
+  if (!listening){ recognizer.start(); listening=true; wakeArmed=true; setStatus('Listening (wake word armed)…'); }
+  else {
+    wakeArmed=false; setStatus('Push-to-talk: speak now…'); try{ recognizer.stop(); }catch{}
+    ensureRecognizer(); const R=window.SpeechRecognition||window.webkitSpeechRecognition; const single=new R();
+    single.continuous=false; single.interimResults=false; single.lang=navigator.language||'en-US';
+    single.onresult=(ev)=>{ const t=ev.results[0][0].transcript.trim(); if(t) handleUserText(t); };
+    single.onend=()=>{ setStatus('Listening (wake word armed)…'); wakeArmed=true; try{ recognizer.start(); listening=true; }catch{} };
     single.start();
   }
 });
@@ -263,10 +212,7 @@ micBtn.addEventListener('click', async () => {
 /***********************
  * 6) FORM HANDLERS
  ***********************/
-document.getElementById('composer').addEventListener('submit', (e) => {
-  e.preventDefault();
-  handleUserText(textEl.value.trim());
-});
+document.getElementById('composer').addEventListener('submit', (e) => { e.preventDefault(); handleUserText(textEl.value.trim()); });
 
 /***********************
  * 7) FIRST RUN MESSAGE
