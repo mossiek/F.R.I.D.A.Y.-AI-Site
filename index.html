@@ -1,4 +1,29 @@
 <!doctype html>
+u.onstart = () => { if(hud){ hud.classList.add('speaking'); } if(core){ core.style.animation = 'coreThrob 1.2s ease-in-out infinite'; } };
+const cleanup = () => { if(hud){ hud.classList.remove('speaking'); } if(core){ core.style.animation = ''; } };
+u.onend = cleanup; u.onerror = cleanup; u.onpause = cleanup;
+speechSynthesis.cancel();
+speechSynthesis.speak(u);
+}
+speechSynthesis.cancel();
+speechSynthesis.speak(u);
+}
+// Ensure voices are loaded on some browsers
+speechSynthesis.onvoiceschanged = () => {};
+
+
+/***********************
+* 5) BROWSER STT (Voice → Text)
+***********************/
+let recognizer = null;
+let listening = false;
+let wakeArmed = false;
+let postWakeTimer = null;
+
+
+function supportsRecognition() {
+return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+}
 
 
 function buildRecognizer() {
