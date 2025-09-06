@@ -1,110 +1,277 @@
 <!doctype html>
-u.onstart = () => { if(hud){ hud.classList.add('speaking'); } if(core){ core.style.animation = 'coreThrob 1.2s ease-in-out infinite'; } };
-const cleanup = () => { if(hud){ hud.classList.remove('speaking'); } if(core){ core.style.animation = ''; } };
-u.onend = cleanup; u.onerror = cleanup; u.onpause = cleanup;
-speechSynthesis.cancel();
-speechSynthesis.speak(u);
-}
-speechSynthesis.cancel();
-speechSynthesis.speak(u);
-}
-// Ensure voices are loaded on some browsers
-speechSynthesis.onvoiceschanged = () => {};
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FRIDAY — Standalone (Text & Voice)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html,body { height:100%; }
+    .glass { background: rgba(20,20,28,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); }
+    .scrollbar::-webkit-scrollbar { width: 10px; }
+    .scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 9999px; }
+    .pulse { box-shadow: 0 0 0 0 rgba(59,130,246,0.7); animation: pulse 1.8s infinite; }
+    @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(59,130,246,0.7); } 70% { box-shadow:0 0 0 20px rgba(59,130,246,0); } 100% { box-shadow:0 0 0 0 rgba(59,130,246,0); } }
 
+    /* HUD — center visual */
+    .hud { position: relative; width: 100%; aspect-ratio: 1.6/1; margin: 0 auto 1rem; display: grid; place-items: center; overflow: hidden;
+           background: radial-gradient(closest-side, rgba(37,99,235,0.08), transparent 60%); border-radius: 1.25rem; border: 1px solid rgba(59,130,246,0.15);
+           transition: box-shadow .3s, background .3s, transform .3s; }
+    .hud.speaking { background: radial-gradient(closest-side, rgba(59,130,246,0.18), transparent 60%); box-shadow: 0 0 24px rgba(59,130,246,.35), inset 0 0 32px rgba(59,130,246,.25); transform: translateZ(0) scale(1.01); }
+    .hud svg { width: 80%; height: auto; filter: drop-shadow(0 0 8px rgba(59,130,246,.35)); }
+    .hud.speaking svg { filter: drop-shadow(0 0 14px rgba(96,165,250,.6)); }
+    .hud .spin-slow { animation: spin 18s linear infinite; transform-origin: 50% 50%; }
+    .hud .spin-fast { animation: spin 6s linear infinite; transform-origin: 50% 50%; }
+    .hud .sweep { animation: sweep 4s linear infinite; transform-origin: 50% 50%; }
+    .hud.speaking .spin-slow { animation-duration: 8s; }
+    .hud.speaking .spin-fast { animation-duration: 3s; }
+    .hud.speaking .sweep { animation-duration: 2s; }
+    .hud .pulse-dot { animation: pulseDot 2.4s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg);} }
+    @keyframes sweep { 0%{ transform: rotate(0deg);} 100%{ transform: rotate(360deg);} }
+    @keyframes pulseDot { 0%,100%{ opacity:.2; r:2 } 50%{ opacity:1; r:5 } }
+    @keyframes coreThrob { 0%,100%{ r:20; opacity:.7 } 50%{ r:24; opacity:1 } }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-slate-100">
+  <div class="mx-auto max-w-3xl px-4 py-10 min-h-screen flex flex-col">
+    <header class="mb-6 flex items-center gap-3">
+      <div class="h-12 w-12 rounded-2xl glass grid place-items-center font-black text-xl select-none">F</div>
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">FRIDAY — Standalone Web App</h1>
+        <p class="text-slate-400 text-sm">Type or say “Hey Friday …”. It will reply in text and voice.</p>
+      </div>
+      <div class="ml-auto flex items-center gap-4 text-sm">
+        <label class="flex items-center gap-2"><input id="toggleWake" type="checkbox" class="accent-blue-500" checked> Wake word</label>
+        <label class="flex items-center gap-2"><input id="toggleTTS" type="checkbox" class="accent-blue-500" checked> Speak replies</label>
+      </div>
+    </header>
+
+    <main class="glass rounded-3xl p-4 flex-1 flex flex-col">
+      <!-- HUD -->
+      <section class="hud">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(59,130,246,0.18)" stroke-width="1"/>
+          <g class="spin-slow"><circle cx="100" cy="100" r="72" fill="none" stroke="rgba(59,130,246,0.45)" stroke-width="1" stroke-dasharray="2 6"/></g>
+          <g class="spin-fast"><circle cx="100" cy="100" r="60" fill="none" stroke="rgba(147,197,253,0.6)" stroke-width="1" stroke-dasharray="6 8"/></g>
+          <g class="sweep"><path d="M100,100 L100,24 A76,76 0 0,1 164,100 Z" fill="url(#grad)" opacity="0.35"/></g>
+          <circle class="core" cx="100" cy="100" r="20" fill="rgba(59,130,246,0.15)" stroke="rgba(191,219,254,0.8)" stroke-width="1"/>
+          <circle class="pulse-dot" cx="140" cy="88" r="3" fill="rgb(96,165,250)"/>
+          <defs>
+            <radialGradient id="grad" cx="50%" cy="50%">
+              <stop offset="0%" stop-color="rgba(59,130,246,0.6)"/>
+              <stop offset="100%" stop-color="rgba(59,130,246,0)"/>
+            </radialGradient>
+          </defs>
+        </svg>
+      </section>
+
+      <div id="log" class="scrollbar flex-1 overflow-y-auto space-y-3 p-2 rounded-2xl border border-white/10"></div>
+
+      <form id="composer" class="mt-4 flex items-center gap-2" autocomplete="off">
+        <input id="text" class="flex-1 rounded-2xl border border-slate-700 bg-slate-900/60 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600"
+               placeholder="Type a message… (or say ‘Hey Friday’)"/>
+        <button type="button" id="micBtn" title="Click once to arm wake-word. Click again for push-to-talk."
+                class="rounded-2xl px-4 py-3 glass border border-slate-700 hover:border-blue-500 transition select-none">🎙️</button>
+        <button class="rounded-2xl px-4 py-3 bg-blue-600 hover:bg-blue-500 transition">Send</button>
+      </form>
+
+      <div class="mt-3 text-xs text-slate-500 flex items-center gap-3">
+        <span id="status">Mic idle</span><span>·</span>
+        <span class="hidden md:inline">HTTPS required for mic. Click the mic to grant permission. Toggle “Speak replies” for voice.</span>
+      </div>
+      <audio id="serverAudio" class="hidden"></audio>
+    </main>
+
+    <footer class="mt-6 text-center text-xs text-slate-500">
+      Browser Speech-to-Text/Text-to-Speech by default. You can swap in server TTS (e.g., ElevenLabs) via <code>audioUrl</code>.
+    </footer>
+  </div>
+
+<script>
+/***********************
+ * 1) CONFIG — EDIT ME
+ ***********************/
+const CONFIG = {
+  N8N_WEBHOOK_URL: "https://YOUR_N8N_DOMAIN/webhook/friday", // <— CHANGE THIS
+  MODEL_HINT: "You are FRIDAY, Mossie’s assistant.",
+  VOICE_NAME: null, // e.g. "Microsoft Zira" | "Google US English" | null
+  WAKE_WORD: "hey friday",
+  AUTO_LISTEN_AFTER_WAKE_MS: 5500,
+};
 
 /***********************
-* 5) BROWSER STT (Voice → Text)
-***********************/
+ * 2) UI HELPERS
+ ***********************/
+const logEl = document.getElementById('log');
+const textEl = document.getElementById('text');
+const statusEl = document.getElementById('status');
+const micBtn = document.getElementById('micBtn');
+const toggleWake = document.getElementById('toggleWake');
+const toggleTTS = document.getElementById('toggleTTS');
+const serverAudio = document.getElementById('serverAudio');
+
+function addMessage(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = `flex ${role==='user' ? 'justify-end' : 'justify-start'}`;
+  const bubble = document.createElement('div');
+  bubble.className = `max-w-[85%] rounded-2xl px-4 py-3 ${role==='user' ? 'bg-blue-600/80' : 'bg-slate-800/80'} border border-white/10 whitespace-pre-wrap`;
+  bubble.innerText = text;
+  wrap.appendChild(bubble);
+  logEl.appendChild(wrap);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setStatus(s) { statusEl.textContent = s; }
+
+/***********************
+ * 3) TEXT <-> FRIDAY (n8n)
+ ***********************/
+async function sendTextToFriday(text) {
+  const payload = { text, system: CONFIG.MODEL_HINT, sessionId: localStorage.getItem('fridaySession') || crypto.randomUUID() };
+  localStorage.setItem('fridaySession', payload.sessionId);
+  const res = await fetch(CONFIG.N8N_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error('FRIDAY webhook error: ' + res.status);
+  return res.json(); // expect { reply: string, audioUrl?: string }
+}
+async function handleUserText(text) {
+  if (!text) return;
+  addMessage('user', text);
+  textEl.value = '';
+  setStatus('Thinking…');
+  try {
+    const data = await sendTextToFriday(text);
+    const reply = data.reply || '(No reply)';
+    addMessage('assistant', reply);
+    if (data.audioUrl) {
+      // prefer server audio if provided
+      await playServerAudio(data.audioUrl);
+    } else {
+      speak(reply);
+    }
+    setStatus('Ready');
+  } catch (e) {
+    console.error(e);
+    addMessage('assistant', '⚠️ Error reaching FRIDAY. Check your webhook URL & CORS.');
+    setStatus('Error');
+  }
+}
+
+/***********************
+ * 4) SPEAK (Text → Voice) + HUD reactions
+ ***********************/
+function beginHudSpeak() {
+  const hud = document.querySelector('.hud');
+  const core = document.querySelector('.hud .core');
+  if (hud) hud.classList.add('speaking');
+  if (core) core.style.animation = 'coreThrob 1.2s ease-in-out infinite';
+}
+function endHudSpeak() {
+  const hud = document.querySelector('.hud');
+  const core = document.querySelector('.hud .core');
+  if (hud) hud.classList.remove('speaking');
+  if (core) core.style.animation = '';
+}
+function speak(text) {
+  if (!toggleTTS.checked) return;
+  const u = new SpeechSynthesisUtterance(text);
+  if (CONFIG.VOICE_NAME) {
+    const v = speechSynthesis.getVoices().find(v => v.name === CONFIG.VOICE_NAME);
+    if (v) u.voice = v;
+  }
+  u.onstart = beginHudSpeak;
+  const cleanup = () => endHudSpeak();
+  u.onend = cleanup; u.onerror = cleanup; u.onpause = cleanup;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+// server audio (e.g., ElevenLabs)
+function playServerAudio(url) {
+  return new Promise((resolve) => {
+    serverAudio.src = url;
+    serverAudio.onplay = beginHudSpeak;
+    const cleanup = () => { endHudSpeak(); serverAudio.onended = serverAudio.onerror = null; resolve(); };
+    serverAudio.onended = cleanup;
+    serverAudio.onerror = cleanup;
+    serverAudio.play().catch(cleanup);
+  });
+}
+speechSynthesis.onvoiceschanged = () => {};
+
+/***********************
+ * 5) BROWSER STT (Voice → Text)
+ ***********************/
 let recognizer = null;
 let listening = false;
 let wakeArmed = false;
 let postWakeTimer = null;
 
-
-function supportsRecognition() {
-return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-}
-
-
+function supportsRecognition() { return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window; }
 function buildRecognizer() {
-const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-const rec = new R();
-rec.continuous = true;
-rec.interimResults = true;
-rec.lang = navigator.language || 'en-US';
-rec.onstart = () => setStatus('Mic listening…');
-rec.onerror = (e) => setStatus('Mic error: ' + (e.error||'unknown'));
-rec.onend = () => { setStatus('Mic idle'); listening = false; };
-rec.onresult = (ev) => {
-let lastFinal = '';
-for (let i = ev.resultIndex; i < ev.results.length; i++) {
-const r = ev.results[i];
-const t = r[0].transcript.toLowerCase().trim();
-if (r.isFinal) lastFinal = t;
-// Wake word detect from interim or final
-if (toggleWake.checked && wakeArmed && t.includes(CONFIG.WAKE_WORD)) {
-wakeArmed = false; // disarm
-micBtn.classList.add('pulse');
-setStatus('Wake word heard. Speak your request…');
-clearTimeout(postWakeTimer);
-postWakeTimer = setTimeout(() => {
-micBtn.classList.remove('pulse');
-const cleaned = (lastFinal||'').replace(CONFIG.WAKE_WORD, '').trim();
-if (cleaned) handleUserText(cleaned);
-wakeArmed = true; // re-arm for next time
-setStatus('Ready');
-}, CONFIG.AUTO_LISTEN_AFTER_WAKE_MS);
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new R();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = navigator.language || 'en-US';
+  rec.onstart = () => setStatus('Mic listening…');
+  rec.onerror = (e) => setStatus('Mic error: ' + (e.error||'unknown'));
+  rec.onend = () => { setStatus('Mic idle'); listening = false; };
+  rec.onresult = (ev) => {
+    let lastFinal = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const r = ev.results[i];
+      const t = r[0].transcript.toLowerCase().trim();
+      if (r.isFinal) lastFinal = t;
+      if (toggleWake.checked && wakeArmed && t.includes(CONFIG.WAKE_WORD)) {
+        wakeArmed = false;
+        micBtn.classList.add('pulse');
+        setStatus('Wake word heard. Speak your request…');
+        clearTimeout(postWakeTimer);
+        postWakeTimer = setTimeout(() => {
+          micBtn.classList.remove('pulse');
+          const cleaned = (lastFinal||'').replace(CONFIG.WAKE_WORD, '').trim();
+          if (cleaned) handleUserText(cleaned);
+          wakeArmed = true;
+          setStatus('Ready');
+        }, CONFIG.AUTO_LISTEN_AFTER_WAKE_MS);
+      }
+    }
+  };
+  return rec;
 }
-}
-};
-return rec;
-}
-
-
 function ensureRecognizer() { if (!recognizer) recognizer = buildRecognizer(); }
 
-
-// Mic button behavior: first click arms continuous wake‑word mode; click again for push‑to‑talk burst
+// Mic button: first click arms wake-word; click again for push-to-talk burst
 micBtn.addEventListener('click', async () => {
-if (!supportsRecognition()) {
-alert('Your browser does not support Speech Recognition. Try Chrome or Edge on desktop.');
-return;
-}
-ensureRecognizer();
-if (!listening) {
-recognizer.start();
-listening = true;
-wakeArmed = true;
-setStatus('Listening (wake word armed)…');
-} else {
-// Push‑to‑talk: capture a short utterance
-wakeArmed = false;
-setStatus('Push‑to‑talk: speak now…');
-try { recognizer.stop(); } catch {}
-ensureRecognizer();
-const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-const single = new R();
-single.continuous = false;
-single.interimResults = false;
-single.lang = navigator.language || 'en-US';
-single.onresult = (ev)=>{ const t = ev.results[0][0].transcript.trim(); if (t) handleUserText(t); };
-single.onend = ()=>{ setStatus('Listening (wake word armed)…'); wakeArmed = true; try { recognizer.start(); listening = true; } catch {} };
-single.start();
-}
+  if (!supportsRecognition()) { alert('Your browser does not support Speech Recognition. Try Chrome or Edge on desktop.'); return; }
+  ensureRecognizer();
+  if (!listening) {
+    recognizer.start(); listening = true; wakeArmed = true; setStatus('Listening (wake word armed)…');
+  } else {
+    wakeArmed = false; setStatus('Push-to-talk: speak now…');
+    try { recognizer.stop(); } catch {}
+    ensureRecognizer();
+    const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const single = new R();
+    single.continuous = false; single.interimResults = false; single.lang = navigator.language || 'en-US';
+    single.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) handleUserText(t); };
+    single.onend = () => { setStatus('Listening (wake word armed)…'); wakeArmed = true; try { recognizer.start(); listening = true; } catch {} };
+    single.start();
+  }
 });
 
+/***********************
+ * 6) FORM HANDLERS
+ ***********************/
+document.getElementById('composer').addEventListener('submit', (e) => {
+  e.preventDefault();
+  handleUserText(textEl.value.trim());
+});
 
 /***********************
-* 6) FORM HANDLERS
-***********************/
-const form = document.getElementById('composer');
-form.addEventListener('submit', (e) => { e.preventDefault(); handleUserText(textEl.value.trim()); });
-
-
-/***********************
-* 7) FIRST RUN MESSAGE
-***********************/
-addMessage('assistant', 'Hello! I\'m FRIDAY. Click the mic once to arm wake‑word listening, then say “Hey Friday …”. Or just type below.');
+ * 7) FIRST RUN MESSAGE
+ ***********************/
+addMessage('assistant', 'Hello! I\'m FRIDAY. Click the mic once to arm wake-word listening, then say “Hey Friday …”. Or just type below.');
 setStatus('Mic idle');
 </script>
 </body>
